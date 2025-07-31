@@ -6,6 +6,7 @@ export interface Character {
   archetype: string;
   stats: CharacterStats;
   skills: string[];
+  ownerId: string; // Firebase UID of the character owner
   createdAt: string;
   updatedAt: string;
 }

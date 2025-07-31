@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useKV } from '@github/spark/hooks';
+import { useAuth } from '../contexts/AuthContext';
 import { Character } from '../lib/types';
+import { characterApi, ApiError } from '../lib/api';
 import { toast } from 'sonner';
 
 interface UseCharactersState {
@@ -12,48 +13,59 @@ interface UseCharactersState {
 }
 
 interface UseCharactersActions {
-  createCharacter: (character: Omit<Character, 'id' | 'createdAt'>) => Promise<void>;
+  createCharacter: (character: Omit<Character, 'id' | 'createdAt' | 'updatedAt' | 'ownerId'>) => Promise<void>;
   updateCharacter: (id: string, character: Partial<Character>) => Promise<void>;
   deleteCharacter: (id: string) => Promise<void>;
   refreshCharacters: () => Promise<void>;
 }
 
 export function useCharacters(): UseCharactersState & UseCharactersActions {
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
-  // Use user-specific storage for characters
-  const [characters, setCharacters] = useKV('user-characters', [] as Character[]);
+  const { currentUser, getIdToken } = useAuth();
 
-  // Load user information and set up authentication
-  const loadUserInfo = async () => {
+  const isAuthenticated = !!currentUser;
+
+  // Load characters from API
+  const loadCharacters = async () => {
+    if (!currentUser) {
+      setCharacters([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       
-      const userInfo = await spark.user();
-      setUser(userInfo);
-      setIsAuthenticated(true);
-      
-      // Characters are automatically loaded via useKV hook
-      setLoading(false);
+      const idToken = await getIdToken();
+      if (!idToken) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      const charactersData = await characterApi.getCharacters(idToken);
+      setCharacters(charactersData);
     } catch (err) {
-      // User not authenticated
-      setIsAuthenticated(false);
-      setUser(null);
-      setLoading(false);
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+        ? err.message 
+        : 'Failed to load characters';
       
-      // Show helpful message for unauthenticated users
-      toast.info('Sign in with GitHub to save characters to your account', {
-        duration: 5000,
-      });
+      setError(errorMessage);
+      
+      // Only show error toast if it's not a connection issue
+      if (!(err instanceof ApiError && err.status >= 500)) {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   // Create new character
-  const createCharacter = async (characterData: Omit<Character, 'id' | 'createdAt'>) => {
+  const createCharacter = async (characterData: Omit<Character, 'id' | 'createdAt' | 'updatedAt' | 'ownerId'>) => {
     try {
       setError(null);
       
@@ -62,17 +74,21 @@ export function useCharacters(): UseCharactersState & UseCharactersActions {
         return;
       }
       
-      const newCharacter: Character = {
-        ...characterData,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Use functional update to avoid stale closure issues
-      setCharacters((currentCharacters) => [...currentCharacters, newCharacter]);
-      toast.success('Character created and saved to your account!');
+      const idToken = await getIdToken();
+      if (!idToken) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      const newCharacter = await characterApi.createCharacter(characterData, idToken);
+      setCharacters(prev => [...prev, newCharacter]);
+      toast.success('Character created and saved!');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create character';
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+        ? err.message 
+        : 'Failed to create character';
+      
       setError(errorMessage);
       toast.error(errorMessage);
       throw err;
@@ -89,15 +105,36 @@ export function useCharacters(): UseCharactersState & UseCharactersActions {
         return;
       }
       
-      // Use functional update to get current characters and avoid stale closure
-      setCharacters((currentCharacters) => 
-        currentCharacters.map(char => 
-          char.id === id ? { ...char, ...updates } : char
-        )
-      );
+      const idToken = await getIdToken();
+      if (!idToken) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      // Get the current character to merge updates
+      const currentCharacter = characters.find(char => char.id === id);
+      if (!currentCharacter) {
+        throw new Error('Character not found');
+      }
+
+      const updatedCharacterData = {
+        name: updates.name || currentCharacter.name,
+        level: updates.level || currentCharacter.level,
+        role: updates.role || currentCharacter.role,
+        archetype: updates.archetype || currentCharacter.archetype,
+        stats: updates.stats || currentCharacter.stats,
+        skills: updates.skills || currentCharacter.skills,
+      };
+
+      const updatedCharacter = await characterApi.updateCharacter(id, updatedCharacterData, idToken);
+      setCharacters(prev => prev.map(char => char.id === id ? updatedCharacter : char));
       toast.success('Character updated and saved!');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update character';
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+        ? err.message 
+        : 'Failed to update character';
+      
       setError(errorMessage);
       toast.error(errorMessage);
       throw err;
@@ -114,34 +151,42 @@ export function useCharacters(): UseCharactersState & UseCharactersActions {
         return;
       }
       
-      // Use functional update to filter out the deleted character
-      setCharacters((currentCharacters) => 
-        currentCharacters.filter(char => char.id !== id)
-      );
-      toast.success('Character deleted from your account!');
+      const idToken = await getIdToken();
+      if (!idToken) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      await characterApi.deleteCharacter(id, idToken);
+      setCharacters(prev => prev.filter(char => char.id !== id));
+      toast.success('Character deleted!');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete character';
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+        ? err.message 
+        : 'Failed to delete character';
+      
       setError(errorMessage);
       toast.error(errorMessage);
       throw err;
     }
   };
 
-  // Refresh characters from storage
+  // Refresh characters from API
   const refreshCharacters = async () => {
-    await loadUserInfo();
+    await loadCharacters();
   };
 
-  // Load user info on mount
+  // Load characters when user authentication state changes
   useEffect(() => {
-    loadUserInfo();
-  }, []);
+    loadCharacters();
+  }, [currentUser]);
 
   return {
     characters,
     loading,
     error,
-    user,
+    user: currentUser,
     isAuthenticated,
     createCharacter,
     updateCharacter,

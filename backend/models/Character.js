@@ -2,162 +2,113 @@ const mongoose = require('mongoose');
 
 /**
  * Character Schema for Primus Character Creator
- * Represents a D&D-style character with stats, skills, and metadata
+ * Includes ownerId to associate characters with Firebase users
  */
 const characterSchema = new mongoose.Schema({
-  // Basic character information
   name: {
     type: String,
-    required: [true, 'Character name is required'],
+    required: true,
     trim: true,
-    minlength: [1, 'Character name must be at least 1 character'],
-    maxlength: [50, 'Character name cannot exceed 50 characters']
+    maxlength: 100
   },
-  
-  // Character role/class system
-  role: {
-    type: String,
-    required: [true, 'Character role is required'],
-    enum: {
-      values: ['DPS', 'Support', 'Tank'],
-      message: '{VALUE} is not a valid role. Must be DPS, Support, or Tank'
-    }
-  },
-  
-  archetype: {
-    type: String,
-    required: [true, 'Character archetype is required'],
-    trim: true,
-    maxlength: [30, 'Archetype cannot exceed 30 characters']
-  },
-  
-  // Character progression
   level: {
     type: Number,
-    default: 1,
-    min: [1, 'Level must be at least 1'],
-    max: [20, 'Level cannot exceed 20']
+    required: true,
+    min: 1,
+    max: 50,
+    default: 1
   },
-  
-  // Core ability scores (D&D standard)
+  role: {
+    type: String,
+    required: true,
+    enum: ['DPS', 'Support', 'Tank'],
+    trim: true
+  },
+  archetype: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 100
+  },
   stats: {
-    STR: {
+    strength: {
       type: Number,
       required: true,
-      min: [1, 'STR must be at least 1'],
-      max: [20, 'STR cannot exceed 20'],
+      min: 1,
+      max: 30,
       default: 10
     },
-    DEX: {
+    dexterity: {
       type: Number,
       required: true,
-      min: [1, 'DEX must be at least 1'],
-      max: [20, 'DEX cannot exceed 20'],
+      min: 1,
+      max: 30,
       default: 10
     },
-    CON: {
+    constitution: {
       type: Number,
       required: true,
-      min: [1, 'CON must be at least 1'],
-      max: [20, 'CON cannot exceed 20'],
+      min: 1,
+      max: 30,
       default: 10
     },
-    INT: {
+    intelligence: {
       type: Number,
       required: true,
-      min: [1, 'INT must be at least 1'],
-      max: [20, 'INT cannot exceed 20'],
+      min: 1,
+      max: 30,
       default: 10
     },
-    WIS: {
+    wisdom: {
       type: Number,
       required: true,
-      min: [1, 'WIS must be at least 1'],
-      max: [20, 'WIS cannot exceed 20'],
+      min: 1,
+      max: 30,
       default: 10
     },
-    CHA: {
+    charisma: {
       type: Number,
       required: true,
-      min: [1, 'CHA must be at least 1'],
-      max: [20, 'CHA cannot exceed 20'],
+      min: 1,
+      max: 30,
       default: 10
     }
   },
-  
-  // Character skills and abilities
   skills: [{
     type: String,
-    trim: true,
-    maxlength: [40, 'Skill name cannot exceed 40 characters']
+    trim: true
   }],
-  
-  // Optional character background/flavor
-  background: {
+  ownerId: {
     type: String,
-    trim: true,
-    maxlength: [500, 'Background cannot exceed 500 characters']
-  },
-  
-  // Equipment and inventory (optional)
-  equipment: [{
-    name: {
-      type: String,
-      trim: true,
-      maxlength: [50, 'Equipment name cannot exceed 50 characters']
-    },
-    quantity: {
-      type: Number,
-      default: 1,
-      min: [0, 'Quantity cannot be negative']
-    }
-  }]
+    required: true,
+    index: true, // Index for efficient queries by owner
+    trim: true
+  }
 }, {
-  // Add timestamps for creation and updates
-  timestamps: true,
-  
-  // Include version key for optimistic concurrency control
-  versionKey: true
+  timestamps: true, // Automatically adds createdAt and updatedAt
+  toJSON: {
+    transform: function(doc, ret) {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    }
+  }
 });
 
-// Add indexes for better query performance
-characterSchema.index({ name: 1 });
-characterSchema.index({ role: 1 });
-characterSchema.index({ level: 1 });
-characterSchema.index({ createdAt: -1 });
+// Index for efficient queries by owner
+characterSchema.index({ ownerId: 1, createdAt: -1 });
 
-// Add virtual for stat total (useful for character power level)
-characterSchema.virtual('statTotal').get(function() {
-  const { STR, DEX, CON, INT, WIS, CHA } = this.stats;
-  return STR + DEX + CON + INT + WIS + CHA;
-});
-
-// Add virtual for stat modifier calculation (D&D standard)
-characterSchema.virtual('statModifiers').get(function() {
-  const calculateModifier = (score) => Math.floor((score - 10) / 2);
-  
-  return {
-    STR: calculateModifier(this.stats.STR),
-    DEX: calculateModifier(this.stats.DEX),
-    CON: calculateModifier(this.stats.CON),
-    INT: calculateModifier(this.stats.INT),
-    WIS: calculateModifier(this.stats.WIS),
-    CHA: calculateModifier(this.stats.CHA)
-  };
-});
-
-// Ensure virtuals are included when converting to JSON
-characterSchema.set('toJSON', { virtuals: true });
-characterSchema.set('toObject', { virtuals: true });
-
-// Pre-save middleware to ensure data consistency
+// Validate that stats don't exceed point buy limits (optional business rule)
 characterSchema.pre('save', function(next) {
-  // Ensure skills array doesn't have duplicates
-  this.skills = [...new Set(this.skills.filter(skill => skill && skill.trim()))];
+  const totalStatPoints = Object.values(this.stats).reduce((sum, stat) => sum + stat, 0);
+  const maxPoints = 90; // 6 stats × 15 average points each
+  
+  if (totalStatPoints > maxPoints) {
+    return next(new Error(`Total stat points (${totalStatPoints}) exceed maximum allowed (${maxPoints})`));
+  }
+  
   next();
 });
 
-// Create and export the Character model
-const Character = mongoose.model('Character', characterSchema);
-
-module.exports = Character;
+module.exports = mongoose.model('Character', characterSchema);

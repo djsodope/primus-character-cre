@@ -1,11 +1,25 @@
 import { Character } from './types';
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL 
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-// API Error Class
+interface CreateCharacterData {
+  name: string;
+  level: number;
+  role: string;
+  archetype: string;
+  stats: {
+    strength: number;
+    dexterity: number;
+    constitution: number;
+    intelligence: number;
+    wisdom: number;
+    charisma: number;
+  };
+  skills: string[];
+}
+
+interface UpdateCharacterData extends CreateCharacterData {}
+
 class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -13,77 +27,82 @@ class ApiError extends Error {
   }
 }
 
-// Generic API Request Handler
-async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new ApiError(response.status, errorData.message || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    
-    // Network or other errors
-    throw new ApiError(0, `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, errorData.message || 'An error occurred');
   }
-}
+  return response.json();
+};
 
-// Character API Functions
 export const characterApi = {
-  // Fetch all characters
-  async getAll(): Promise<Character[]> {
-    return apiRequest<Character[]>('/characters');
+  // Get all characters for the authenticated user
+  async getCharacters(idToken: string): Promise<Character[]> {
+    const response = await fetch(`${API_BASE_URL}/api/characters`, {
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    return handleResponse(response);
   },
 
-  // Fetch single character by ID
-  async getById(id: string): Promise<Character> {
-    return apiRequest<Character>(`/characters/${id}`);
+  // Get a single character by ID
+  async getCharacter(id: string, idToken: string): Promise<Character> {
+    const response = await fetch(`${API_BASE_URL}/api/characters/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    return handleResponse(response);
   },
 
-  // Create new character
-  async create(character: Omit<Character, 'id' | 'createdAt'>): Promise<Character> {
-    return apiRequest<Character>('/characters', {
+  // Create a new character
+  async createCharacter(character: CreateCharacterData, idToken: string): Promise<Character> {
+    const response = await fetch(`${API_BASE_URL}/api/characters`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(character),
     });
+    
+    return handleResponse(response);
   },
 
-  // Update existing character
-  async update(id: string, character: Partial<Character>): Promise<Character> {
-    return apiRequest<Character>(`/characters/${id}`, {
+  // Update an existing character
+  async updateCharacter(id: string, character: UpdateCharacterData, idToken: string): Promise<Character> {
+    const response = await fetch(`${API_BASE_URL}/api/characters/${id}`, {
       method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(character),
     });
+    
+    return handleResponse(response);
   },
 
-  // Delete character
-  async delete(id: string): Promise<void> {
-    return apiRequest<void>(`/characters/${id}`, {
+  // Delete a character
+  async deleteCharacter(id: string, idToken: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/characters/${id}`, {
       method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
     });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, errorData.message || 'Failed to delete character');
+    }
   },
 };
 
-// Helper function to check if backend is available
-export async function checkBackendHealth(): Promise<boolean> {
-  try {
-    await fetch(`${API_BASE_URL}/health`);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export { ApiError };

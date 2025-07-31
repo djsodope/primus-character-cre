@@ -1,55 +1,53 @@
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { Badge } from './ui/badge';
-import { Crown, User } from '@phosphor-icons/react';
+import { User, SignOut } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 
-interface UserProfileProps {
-  user: {
-    login: string;
-    avatarUrl: string;
-    email?: string;
-    isOwner: boolean;
+export const UserProfile: React.FC = () => {
+  const { currentUser, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Signed out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to sign out');
+    }
   };
-}
 
-export function UserProfile({ user }: UserProfileProps) {
+  if (!currentUser) {
+    return null;
+  }
+
   return (
-    <Card className="max-w-md mx-auto bg-accent/5 border-accent/20">
-      <CardContent className="flex items-center gap-3 py-4">
-        <div className="relative">
-          <img 
-            src={user.avatarUrl} 
-            alt={`${user.login}'s avatar`}
-            className="w-12 h-12 rounded-full border-2 border-accent/30"
-          />
-          {user.isOwner && (
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-accent rounded-full flex items-center justify-center">
-              <Crown className="w-3 h-3 text-accent-foreground" weight="fill" />
-            </div>
-          )}
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-foreground truncate">
-              {user.login}
-            </h3>
-            {user.isOwner && (
-              <Badge variant="secondary" className="text-xs">
-                Owner
-              </Badge>
-            )}
+    <Card className="max-w-sm mx-auto parchment-bg fantasy-border">
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-accent/10 rounded-full flex items-center justify-center">
+            <User className="w-5 h-5 text-accent" weight="fill" />
           </div>
-          {user.email && (
-            <p className="text-sm text-muted-foreground truncate">
-              {user.email}
+          <div className="text-left">
+            <p className="font-medium text-sm text-foreground">
+              {currentUser.email}
             </p>
-          )}
+            <p className="text-xs text-muted-foreground">
+              Adventurer
+            </p>
+          </div>
         </div>
         
-        <div className="text-accent">
-          <User className="w-5 h-5" weight="fill" />
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <SignOut className="w-4 h-4" />
+        </Button>
       </CardContent>
     </Card>
   );
-}
+};

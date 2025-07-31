@@ -5,10 +5,10 @@
 **Mission Statement**: Primus Character Creator is a web application that enables tabletop RPG players to create, customize, and manage character sheets for Dungeons & Dragons-style campaigns with secure personal account storage.
 
 **Success Indicators**: 
-- Users can successfully create and save characters to their personal GitHub accounts
-- Characters persist across sessions and devices
+- Users can successfully create and save characters to their personal Firebase accounts
+- Characters persist across sessions and devices with secure cloud storage
 - Intuitive character creation process with D&D-inspired mechanics
-- Seamless authentication flow using GitHub
+- Seamless authentication flow using email/password registration and login
 
 **Experience Qualities**: Mystical, Organized, Trustworthy
 
@@ -21,9 +21,9 @@
 ## Core Features
 
 ### User Authentication System
-- **Functionality**: Secure GitHub-based authentication using Spark's built-in auth system
-- **Purpose**: Enable personal character storage and account-based data persistence
-- **Success Criteria**: Users can sign in seamlessly and have their characters saved to their account
+- **Functionality**: Secure Firebase-based authentication with email/password registration and login
+- **Purpose**: Enable personal character storage with secure user accounts and cloud-based data persistence
+- **Success Criteria**: Users can register new accounts, sign in seamlessly, and have their characters securely stored in the cloud
 
 ### Character Creation & Management
 - **Functionality**: Multi-step character creator with stats, roles, archetypes, and skills
@@ -31,9 +31,9 @@
 - **Success Criteria**: Users can create complete characters with all necessary RPG elements
 
 ### Personal Character Library
-- **Functionality**: View, edit, and delete saved characters from personal collection
-- **Purpose**: Maintain a persistent library of user's characters
-- **Success Criteria**: Characters are reliably stored and retrievable across sessions
+- **Functionality**: Cloud-based character storage with full CRUD operations (create, read, update, delete) via secure API
+- **Purpose**: Maintain a persistent, secure library of user's characters accessible from any device
+- **Success Criteria**: Characters are reliably stored in MongoDB cloud database, properly scoped to user accounts, and retrievable across sessions and devices
 
 ### Character Sheet Display & Export
 - **Functionality**: View formatted character sheets and export as PDF

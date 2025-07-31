@@ -1,35 +1,30 @@
 const express = require('express');
+const characterController = require('../controllers/characterController');
+const authMiddleware = require('../middleware/authMiddleware');
+
 const router = express.Router();
-const {
-  createCharacter,
-  getAllCharacters,
-  getCharacterById,
-  updateCharacter,
-  deleteCharacter,
-  getCharacterStats
-} = require('../controllers/characterController');
 
 /**
- * Character Routes for Primus Character Creator API
- * All routes are prefixed with /api/characters
+ * Character Routes
+ * All routes require authentication via Firebase ID token
  */
 
-// GET /api/characters/stats - Get character statistics (must come before /:id route)
-router.get('/stats', getCharacterStats);
+// Apply authentication middleware to all character routes
+router.use(authMiddleware);
 
-// POST /api/characters - Create a new character
-router.post('/', createCharacter);
+// GET /api/characters - Get all characters for authenticated user
+router.get('/', characterController.getAllCharacters);
 
-// GET /api/characters - Get all characters (with optional filtering)
-router.get('/', getAllCharacters);
+// GET /api/characters/:id - Get single character by ID
+router.get('/:id', characterController.getCharacterById);
 
-// GET /api/characters/:id - Get a single character by ID
-router.get('/:id', getCharacterById);
+// POST /api/characters - Create new character
+router.post('/', characterController.createCharacter);
 
-// PUT /api/characters/:id - Update a character
-router.put('/:id', updateCharacter);
+// PUT /api/characters/:id - Update existing character
+router.put('/:id', characterController.updateCharacter);
 
-// DELETE /api/characters/:id - Delete a character
-router.delete('/:id', deleteCharacter);
+// DELETE /api/characters/:id - Delete character
+router.delete('/:id', characterController.deleteCharacter);
 
 module.exports = router;

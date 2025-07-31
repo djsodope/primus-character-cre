@@ -1,286 +1,217 @@
 const Character = require('../models/Character');
 
 /**
- * Character Controller
- * Handles all CRUD operations for character management
+ * Character Controller - Handles all character CRUD operations
+ * All operations are scoped to the authenticated user's ownerId
  */
-
-/**
- * Create a new character
- * POST /api/characters
- */
-const createCharacter = async (req, res) => {
-  try {
-    // Validate required fields are present
-    const { name, role, archetype, stats } = req.body;
-    
-    if (!name || !role || !archetype) {
-      return res.status(400).json({
-        success: false,
-        error: 'Name, role, and archetype are required fields'
+const characterController = {
+  
+  /**
+   * GET /api/characters
+   * Get all characters for the authenticated user
+   */
+  async getAllCharacters(req, res) {
+    try {
+      const characters = await Character.find({ ownerId: req.user.uid })
+        .sort({ createdAt: -1 }); // Most recent first
+      
+      res.json(characters);
+    } catch (error) {
+      console.error('Get characters error:', error);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve characters'
       });
     }
+  },
 
-    // Create new character with validated data
-    const character = new Character(req.body);
-    const savedCharacter = await character.save();
-    
-    res.status(201).json({
-      success: true,
-      data: savedCharacter
-    });
-  } catch (error) {
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors
+  /**
+   * GET /api/characters/:id
+   * Get a single character by ID (must belong to authenticated user)
+   */
+  async getCharacterById(req, res) {
+    try {
+      const character = await Character.findOne({ 
+        _id: req.params.id, 
+        ownerId: req.user.uid 
       });
-    }
-    
-    // Handle other errors
-    console.error('Error creating character:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create character'
-    });
-  }
-};
-
-/**
- * Get all characters
- * GET /api/characters
- */
-const getAllCharacters = async (req, res) => {
-  try {
-    // Support query parameters for filtering and sorting
-    const { role, level, sortBy = 'createdAt', order = 'desc' } = req.query;
-    
-    // Build filter object
-    const filter = {};
-    if (role) filter.role = role;
-    if (level) filter.level = parseInt(level);
-    
-    // Build sort object
-    const sortOrder = order === 'asc' ? 1 : -1;
-    const sort = { [sortBy]: sortOrder };
-    
-    const characters = await Character.find(filter)
-      .sort(sort)
-      .select('-__v'); // Exclude version key from response
-    
-    res.json({
-      success: true,
-      count: characters.length,
-      data: characters
-    });
-  } catch (error) {
-    console.error('Error fetching characters:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch characters'
-    });
-  }
-};
-
-/**
- * Get a single character by ID
- * GET /api/characters/:id
- */
-const getCharacterById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Validate MongoDB ObjectId format
-    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid character ID format'
-      });
-    }
-    
-    const character = await Character.findById(id).select('-__v');
-    
-    if (!character) {
-      return res.status(404).json({
-        success: false,
-        error: 'Character not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: character
-    });
-  } catch (error) {
-    console.error('Error fetching character:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch character'
-    });
-  }
-};
-
-/**
- * Update a character
- * PUT /api/characters/:id
- */
-const updateCharacter = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Validate MongoDB ObjectId format
-    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid character ID format'
-      });
-    }
-    
-    // Find and update character
-    const character = await Character.findByIdAndUpdate(
-      id,
-      req.body,
-      {
-        new: true, // Return updated document
-        runValidators: true, // Run schema validation
-        select: '-__v' // Exclude version key
+      
+      if (!character) {
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Character not found'
+        });
       }
-    );
-    
-    if (!character) {
-      return res.status(404).json({
-        success: false,
-        error: 'Character not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: character
-    });
-  } catch (error) {
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors
-      });
-    }
-    
-    console.error('Error updating character:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update character'
-    });
-  }
-};
-
-/**
- * Delete a character
- * DELETE /api/characters/:id
- */
-const deleteCharacter = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Validate MongoDB ObjectId format
-    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid character ID format'
-      });
-    }
-    
-    const character = await Character.findByIdAndDelete(id);
-    
-    if (!character) {
-      return res.status(404).json({
-        success: false,
-        error: 'Character not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Character deleted successfully',
-      data: { id: character._id, name: character.name }
-    });
-  } catch (error) {
-    console.error('Error deleting character:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to delete character'
-    });
-  }
-};
-
-/**
- * Get character statistics (dashboard data)
- * GET /api/characters/stats
- */
-const getCharacterStats = async (req, res) => {
-  try {
-    // Aggregate character statistics
-    const stats = await Character.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalCharacters: { $sum: 1 },
-          averageLevel: { $avg: '$level' },
-          roleDistribution: {
-            $push: '$role'
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          totalCharacters: 1,
-          averageLevel: { $round: ['$averageLevel', 1] },
-          roleDistribution: 1
-        }
+      
+      res.json(character);
+    } catch (error) {
+      console.error('Get character error:', error);
+      
+      // Handle invalid ObjectId
+      if (error.name === 'CastError') {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid character ID'
+        });
       }
-    ]);
-    
-    // Count characters by role
-    const roleCounts = await Character.aggregate([
-      {
-        $group: {
-          _id: '$role',
-          count: { $sum: 1 }
-        }
+      
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve character'
+      });
+    }
+  },
+
+  /**
+   * POST /api/characters
+   * Create a new character for the authenticated user
+   */
+  async createCharacter(req, res) {
+    try {
+      const { name, level, role, archetype, stats, skills } = req.body;
+      
+      // Validate required fields
+      if (!name || !role || !archetype || !stats) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Missing required fields: name, role, archetype, and stats are required'
+        });
       }
-    ]);
-    
-    const result = stats[0] || { totalCharacters: 0, averageLevel: 0 };
-    result.roleBreakdown = roleCounts.reduce((acc, curr) => {
-      acc[curr._id] = curr.count;
-      return acc;
-    }, {});
-    
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Error fetching character stats:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch character statistics'
-    });
+
+      // Create new character with owner ID
+      const character = new Character({
+        name,
+        level: level || 1,
+        role,
+        archetype,
+        stats,
+        skills: skills || [],
+        ownerId: req.user.uid
+      });
+
+      const savedCharacter = await character.save();
+      
+      res.status(201).json(savedCharacter);
+    } catch (error) {
+      console.error('Create character error:', error);
+      
+      // Handle validation errors
+      if (error.name === 'ValidationError') {
+        const validationErrors = Object.values(error.errors).map(err => err.message);
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'Invalid character data',
+          details: validationErrors
+        });
+      }
+      
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to create character'
+      });
+    }
+  },
+
+  /**
+   * PUT /api/characters/:id
+   * Update an existing character (must belong to authenticated user)
+   */
+  async updateCharacter(req, res) {
+    try {
+      const { name, level, role, archetype, stats, skills } = req.body;
+      
+      // Find and update character (only if owned by user)
+      const character = await Character.findOneAndUpdate(
+        { _id: req.params.id, ownerId: req.user.uid },
+        {
+          name,
+          level,
+          role,
+          archetype,
+          stats,
+          skills
+        },
+        { 
+          new: true, // Return updated document
+          runValidators: true // Run schema validations
+        }
+      );
+      
+      if (!character) {
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Character not found'
+        });
+      }
+      
+      res.json(character);
+    } catch (error) {
+      console.error('Update character error:', error);
+      
+      // Handle validation errors
+      if (error.name === 'ValidationError') {
+        const validationErrors = Object.values(error.errors).map(err => err.message);
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'Invalid character data',
+          details: validationErrors
+        });
+      }
+      
+      // Handle invalid ObjectId
+      if (error.name === 'CastError') {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid character ID'
+        });
+      }
+      
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to update character'
+      });
+    }
+  },
+
+  /**
+   * DELETE /api/characters/:id
+   * Delete a character (must belong to authenticated user)
+   */
+  async deleteCharacter(req, res) {
+    try {
+      const character = await Character.findOneAndDelete({ 
+        _id: req.params.id, 
+        ownerId: req.user.uid 
+      });
+      
+      if (!character) {
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Character not found'
+        });
+      }
+      
+      res.json({
+        message: 'Character deleted successfully',
+        deletedCharacter: character
+      });
+    } catch (error) {
+      console.error('Delete character error:', error);
+      
+      // Handle invalid ObjectId
+      if (error.name === 'CastError') {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid character ID'
+        });
+      }
+      
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to delete character'
+      });
+    }
   }
 };
 
-module.exports = {
-  createCharacter,
-  getAllCharacters,
-  getCharacterById,
-  updateCharacter,
-  deleteCharacter,
-  getCharacterStats
-};
+module.exports = characterController;

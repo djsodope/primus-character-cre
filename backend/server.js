@@ -1,104 +1,125 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-
-// Import configuration and middleware
-const connectDB = require('./config/database');
-const { errorHandler, notFound, requestLogger } = require('./middleware/errorHandler');
+const mongoose = require('mongoose');
 
 // Import routes
 const characterRoutes = require('./routes/characterRoutes');
 
-// Load environment variables
-dotenv.config();
-
-// Connect to database
-connectDB();
-
-// Initialize Express app
 const app = express();
+const PORT = process.env.PORT || 3001;
 
-// Trust proxy for deployment platforms (Render, Railway, etc.)
-app.set('trust proxy', 1);
+/**
+ * Middleware Configuration
+ */
 
-// CORS configuration - allow frontend requests
+// CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-frontend-domain.com'] // Replace with your actual frontend URL
-    : ['http://localhost:3000', 'http://localhost:5173'], // Local development
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
   optionsSuccessStatus: 200
 };
 
-// Middleware
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
-app.use(requestLogger); // Log all requests
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logging middleware (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+  });
+}
+
+/**
+ * Database Connection
+ */
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/primus-characters', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('✅ Connected to MongoDB');
+})
+.catch((error) => {
+  console.error('❌ MongoDB connection error:', error);
+  process.exit(1);
+});
+
+/**
+ * API Routes
+ */
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
-    success: true,
-    message: 'Primus Character Creator API is running',
+    status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    service: 'Primus Character Creator API',
+    version: '1.0.0'
   });
 });
 
-// API routes
+// Character routes
 app.use('/api/characters', characterRoutes);
 
-// Root endpoint with API documentation
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: '⚔️ Welcome to Primus Character Creator API',
-    version: '1.0.0',
-    endpoints: {
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.originalUrl} not found`,
+    availableEndpoints: {
       health: 'GET /health',
       characters: {
-        'Create character': 'POST /api/characters',
-        'Get all characters': 'GET /api/characters',
-        'Get character by ID': 'GET /api/characters/:id',
-        'Update character': 'PUT /api/characters/:id',
-        'Delete character': 'DELETE /api/characters/:id',
-        'Get statistics': 'GET /api/characters/stats'
+        list: 'GET /api/characters',
+        get: 'GET /api/characters/:id',
+        create: 'POST /api/characters',
+        update: 'PUT /api/characters/:id',
+        delete: 'DELETE /api/characters/:id'
       }
-    },
-    documentation: 'https://github.com/your-repo/primus-character-creator#api-documentation'
+    }
   });
 });
 
-// Error handling middleware (must be last)
-app.use(notFound);
-app.use(errorHandler);
+/**
+ * Global Error Handler
+ */
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred',
+    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+  });
+});
 
-// Start server
-const PORT = process.env.PORT || 5000;
-
-const server = app.listen(PORT, () => {
-  console.log('🚀 =================================');
-  console.log(`⚔️  Primus Character Creator API`);
-  console.log(`🌐 Server running on port ${PORT}`);
+/**
+ * Start Server
+ */
+app.listen(PORT, () => {
+  console.log(`🚀 Primus Character Creator API running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Local URL: http://localhost:${PORT}`);
-  console.log('🚀 =================================');
+  console.log(`🌐 CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`\n🔗 Available endpoints:`);
+    console.log(`   Health: http://localhost:${PORT}/health`);
+    console.log(`   Characters: http://localhost:${PORT}/api/characters`);
+  }
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.log('❌ Unhandled Promise Rejection:', err.message);
-  // Close server & exit process
-  server.close(() => {
-    process.exit(1);
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received. Shutting down gracefully...');
+  
+  mongoose.connection.close(() => {
+    console.log('📴 MongoDB connection closed');
+    process.exit(0);
   });
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.log('❌ Uncaught Exception:', err.message);
-  process.exit(1);
 });
 
 module.exports = app;
