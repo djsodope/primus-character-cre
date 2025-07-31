@@ -4,9 +4,10 @@ import { useCharacters } from './hooks/useCharacters';
 import { CharacterList } from './components/CharacterList';
 import { CharacterForm } from './components/CharacterForm';
 import { CharacterSheet } from './components/CharacterSheet';
+import { UserProfile } from './components/UserProfile';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Scroll, Sparkles, WifiSlash, ArrowClockwise } from '@phosphor-icons/react';
+import { Scroll, Sparkles, SignIn, ArrowClockwise } from '@phosphor-icons/react';
 import { Toaster } from 'sonner';
 
 type ViewMode = 'list' | 'create' | 'edit' | 'sheet';
@@ -16,7 +17,8 @@ function App() {
     characters,
     loading,
     error,
-    isOffline,
+    user,
+    isAuthenticated,
     createCharacter,
     updateCharacter,
     deleteCharacter,
@@ -42,6 +44,10 @@ function App() {
   };
 
   const handleSaveCharacter = async (character: Character) => {
+    if (!isAuthenticated) {
+      return; // Error handling is done in the hook
+    }
+    
     try {
       const { id, createdAt, ...characterData } = character;
       
@@ -61,6 +67,10 @@ function App() {
   };
 
   const handleDeleteCharacter = async (characterId: string) => {
+    if (!isAuthenticated) {
+      return; // Error handling is done in the hook
+    }
+    
     try {
       await deleteCharacter(characterId);
     } catch (error) {
@@ -81,7 +91,40 @@ function App() {
         <Card className="max-w-md mx-auto parchment-bg fantasy-border">
           <CardContent className="text-center py-8">
             <div className="w-12 h-12 mx-auto mb-4 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-muted-foreground">Loading your characters...</p>
+            <p className="text-muted-foreground">Loading your account...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Authentication required state
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background font-sans flex items-center justify-center">
+        <Card className="max-w-lg mx-auto parchment-bg fantasy-border">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-accent/10 rounded-full flex items-center justify-center">
+              <SignIn className="w-8 h-8 text-accent" weight="fill" />
+            </div>
+            <CardTitle className="font-serif text-3xl text-primary">
+              Welcome to Primus Character Creator
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-muted-foreground">
+              Sign in with your GitHub account to create and save characters to your personal collection.
+              Your characters will be securely stored and available across all your devices.
+            </p>
+            <div className="flex items-center justify-center gap-2 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+              <Sparkles className="w-5 h-5 text-accent" weight="fill" />
+              <span className="text-sm text-accent-foreground font-medium">
+                Authentication powered by GitHub
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              No additional signup required - just use your existing GitHub account
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -94,6 +137,8 @@ function App() {
         character={selectedCharacter}
         onSave={handleSaveCharacter}
         onCancel={handleBackToList}
+        isAuthenticated={isAuthenticated}
+        user={user}
       />
     );
   }
@@ -125,25 +170,15 @@ function App() {
             Build legendary heroes with detailed stats, skills, and backstories.
           </p>
           
-          {/* Connection Status */}
-          {isOffline && (
-            <div className="flex items-center justify-center gap-2 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md mx-auto">
-              <WifiSlash className="w-5 h-5 text-destructive" />
-              <span className="text-sm text-destructive font-medium">
-                Offline Mode - Changes saved locally
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={refreshCharacters}
-                className="h-auto p-1 text-destructive hover:text-destructive"
-              >
-                <ArrowClockwise className="w-4 h-4" />
-              </Button>
+          {/* User Profile */}
+          {isAuthenticated && user && (
+            <div className="mt-6">
+              <UserProfile user={user} />
             </div>
           )}
           
-          {error && !isOffline && (
+          {/* Error Display */}
+          {error && (
             <div className="flex items-center justify-center gap-2 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md mx-auto">
               <span className="text-sm text-destructive">
                 {error}
@@ -194,16 +229,6 @@ function App() {
                 Your Characters ({characters.length})
               </h2>
               <div className="flex gap-2">
-                {isOffline && (
-                  <Button 
-                    variant="outline" 
-                    onClick={refreshCharacters}
-                    className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <ArrowClockwise className="w-4 h-4 mr-2" />
-                    Sync
-                  </Button>
-                )}
                 <Button onClick={handleCreateCharacter} className="glow-hover">
                   <Sparkles className="w-4 h-4 mr-2" weight="fill" />
                   Create New Character

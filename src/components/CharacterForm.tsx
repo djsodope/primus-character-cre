@@ -15,6 +15,8 @@ interface CharacterFormProps {
   character?: Character | null;
   onSave: (character: Character) => void;
   onCancel: () => void;
+  isAuthenticated: boolean;
+  user?: any;
 }
 
 const INITIAL_STATS: CharacterStats = {
@@ -28,7 +30,7 @@ const INITIAL_STATS: CharacterStats = {
 
 const POINT_BUY_TOTAL = 27;
 
-export function CharacterForm({ character, onSave, onCancel }: CharacterFormProps) {
+export function CharacterForm({ character, onSave, onCancel, isAuthenticated, user }: CharacterFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     level: 1,
@@ -161,7 +163,7 @@ export function CharacterForm({ character, onSave, onCancel }: CharacterFormProp
     onSave(newCharacter);
   };
 
-  const canSave = formData.name.trim() && formData.role && formData.archetype && pointsSpent <= POINT_BUY_TOTAL;
+  const canSave = formData.name.trim() && formData.role && formData.archetype && pointsSpent <= POINT_BUY_TOTAL && isAuthenticated;
 
   return (
     <div className="min-h-screen bg-background font-sans">
@@ -181,6 +183,43 @@ export function CharacterForm({ character, onSave, onCancel }: CharacterFormProp
             </p>
           </div>
         </div>
+
+        {/* Authentication Status */}
+        {isAuthenticated && user && (
+          <div className="max-w-4xl mx-auto mb-6">
+            <div className="flex items-center gap-3 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+              <img 
+                src={user.avatarUrl} 
+                alt={`${user.login}'s avatar`}
+                className="w-8 h-8 rounded-full border border-accent/30"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-accent-foreground">
+                  Signed in as {user.login}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Characters will be saved to your account
+                </p>
+              </div>
+              <Sparkles className="w-5 h-5 text-accent" weight="fill" />
+            </div>
+          </div>
+        )}
+
+        {!isAuthenticated && (
+          <div className="max-w-4xl mx-auto mb-6">
+            <div className="flex items-center gap-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-destructive">
+                  Not signed in
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Character will not be saved - please sign in first
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="max-w-4xl mx-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -415,7 +454,12 @@ export function CharacterForm({ character, onSave, onCancel }: CharacterFormProp
             <Button variant="outline" onClick={onCancel}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={!canSave} className="glow-hover">
+            <Button 
+              onClick={handleSave} 
+              disabled={!canSave} 
+              className="glow-hover"
+              title={!isAuthenticated ? "Please sign in to save characters" : undefined}
+            >
               <Sparkles className="w-4 h-4 mr-2" weight="fill" />
               {character ? 'Update Character' : 'Create Character'}
             </Button>
