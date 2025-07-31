@@ -17,7 +17,14 @@ Create a comprehensive D&D-inspired character creation and management tool for t
 - **Purpose**: Primary entry point for new characters, establishes all fundamental character data
 - **Trigger**: User clicks "Create New Character" button
 - **Progression**: Basic Info → Stats Allocation → Role/Archetype Selection → Skill Selection → Review & Save
-- **Success criteria**: Character saves successfully and appears in character list
+- **Success criteria**: Character saves successfully to backend/localStorage and appears in character list
+
+### Backend API Integration
+- **Functionality**: Full CRUD operations (Create, Read, Update, Delete) with MongoDB persistence and offline fallback
+- **Purpose**: Reliable data persistence across sessions with seamless synchronization
+- **Trigger**: All character operations automatically sync to backend when available
+- **Progression**: User Action → API Call → Success/Error Handling → UI Update → Local Backup
+- **Success criteria**: Characters persist across sessions, offline mode works seamlessly, sync restores when connection returns
 
 ### Skill System with Tier Filtering
 - **Functionality**: Hierarchical skill selection with tier-based progression (Tier 1-3) and role-specific recommendations
@@ -27,11 +34,11 @@ Create a comprehensive D&D-inspired character creation and management tool for t
 - **Success criteria**: Skills are properly associated with character and respect tier limitations
 
 ### Character Management Dashboard
-- **Functionality**: Grid view of all created characters with quick actions (edit, duplicate, delete, export)
-- **Purpose**: Central hub for managing multiple characters across campaigns
+- **Functionality**: Grid view of all created characters with quick actions (edit, duplicate, delete, export) plus connection status
+- **Purpose**: Central hub for managing multiple characters across campaigns with real-time sync status
 - **Trigger**: Application loads or user navigates to main view
-- **Progression**: View Character Grid → Select Character → Choose Action (Edit/Export/Delete)
-- **Success criteria**: All characters display correctly with accurate data and actions work reliably
+- **Progression**: View Character Grid → Check Sync Status → Select Character → Choose Action (Edit/Export/Delete)
+- **Success criteria**: All characters display correctly with accurate data, sync status is clear, actions work reliably
 
 ### Printable Character Sheet
 - **Functionality**: Professional D&D-style character sheet layout optimized for printing and PDF export
@@ -42,12 +49,16 @@ Create a comprehensive D&D-inspired character creation and management tool for t
 
 ## Edge Case Handling
 
+- **Backend Connection Loss**: Seamless fallback to offline mode with localStorage persistence and clear user notification
+- **API Errors**: Graceful error handling with user-friendly messages and retry mechanisms
+- **Data Sync Conflicts**: Automatic local backup prevents data loss during connection issues
 - **Empty Character List**: Welcome screen with prominent "Create First Character" call-to-action
 - **Invalid Stat Allocation**: Real-time validation prevents overspending points with clear error messages
 - **Duplicate Character Names**: Automatic numbering system (e.g., "Gandalf", "Gandalf (2)")
 - **PDF Generation Failure**: Graceful fallback to browser print dialog with error notification
 - **Large Character Collections**: Pagination and search functionality for 20+ characters
 - **Incomplete Character Data**: Auto-save drafts and validation warnings before final save
+- **Network Timeouts**: Request timeout handling with automatic retry and offline fallback
 
 ## Design Direction
 

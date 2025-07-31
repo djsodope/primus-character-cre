@@ -1,17 +1,28 @@
 import { useState } from 'react';
-import { useKV } from '@github/spark/hooks';
 import { Character } from './lib/types';
+import { useCharacters } from './hooks/useCharacters';
 import { CharacterList } from './components/CharacterList';
 import { CharacterForm } from './components/CharacterForm';
 import { CharacterSheet } from './components/CharacterSheet';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Scroll, Sparkles } from '@phosphor-icons/react';
+import { Scroll, Sparkles, WifiSlash, ArrowClockwise } from '@phosphor-icons/react';
+import { Toaster } from 'sonner';
 
 type ViewMode = 'list' | 'create' | 'edit' | 'sheet';
 
 function App() {
-  const [characters, setCharacters] = useKV<Character[]>("characters", []);
+  const {
+    characters,
+    loading,
+    error,
+    isOffline,
+    createCharacter,
+    updateCharacter,
+    deleteCharacter,
+    refreshCharacters
+  } = useCharacters();
+  
   const [currentView, setCurrentView] = useState<ViewMode>('list');
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
 
@@ -30,26 +41,52 @@ function App() {
     setCurrentView('sheet');
   };
 
-  const handleSaveCharacter = (character: Character) => {
-    setCharacters(current => {
-      const existing = current.find(c => c.id === character.id);
-      if (existing) {
-        return current.map(c => c.id === character.id ? character : c);
+  const handleSaveCharacter = async (character: Character) => {
+    try {
+      const { id, createdAt, ...characterData } = character;
+      
+      if (selectedCharacter) {
+        // Update existing character
+        await updateCharacter(character.id, characterData);
       } else {
-        return [...current, character];
+        // Create new character
+        await createCharacter(characterData);
       }
-    });
-    setCurrentView('list');
+      
+      setCurrentView('list');
+    } catch (error) {
+      // Error handling is done in the hook
+      console.error('Failed to save character:', error);
+    }
   };
 
-  const handleDeleteCharacter = (characterId: string) => {
-    setCharacters(current => current.filter(c => c.id !== characterId));
+  const handleDeleteCharacter = async (characterId: string) => {
+    try {
+      await deleteCharacter(characterId);
+    } catch (error) {
+      // Error handling is done in the hook
+      console.error('Failed to delete character:', error);
+    }
   };
 
   const handleBackToList = () => {
     setCurrentView('list');
     setSelectedCharacter(null);
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background font-sans flex items-center justify-center">
+        <Card className="max-w-md mx-auto parchment-bg fantasy-border">
+          <CardContent className="text-center py-8">
+            <div className="w-12 h-12 mx-auto mb-4 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-muted-foreground">Loading your characters...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (currentView === 'create' || currentView === 'edit') {
     return (
@@ -87,6 +124,40 @@ function App() {
             Create and manage characters for your tabletop RPG adventures. 
             Build legendary heroes with detailed stats, skills, and backstories.
           </p>
+          
+          {/* Connection Status */}
+          {isOffline && (
+            <div className="flex items-center justify-center gap-2 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md mx-auto">
+              <WifiSlash className="w-5 h-5 text-destructive" />
+              <span className="text-sm text-destructive font-medium">
+                Offline Mode - Changes saved locally
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={refreshCharacters}
+                className="h-auto p-1 text-destructive hover:text-destructive"
+              >
+                <ArrowClockwise className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+          
+          {error && !isOffline && (
+            <div className="flex items-center justify-center gap-2 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md mx-auto">
+              <span className="text-sm text-destructive">
+                {error}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={refreshCharacters}
+                className="h-auto p-1 text-destructive hover:text-destructive"
+              >
+                <ArrowClockwise className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </div>
 
         {characters.length === 0 ? (
@@ -122,10 +193,22 @@ function App() {
               <h2 className="font-serif text-2xl font-semibold text-primary">
                 Your Characters ({characters.length})
               </h2>
-              <Button onClick={handleCreateCharacter} className="glow-hover">
-                <Sparkles className="w-4 h-4 mr-2" weight="fill" />
-                Create New Character
-              </Button>
+              <div className="flex gap-2">
+                {isOffline && (
+                  <Button 
+                    variant="outline" 
+                    onClick={refreshCharacters}
+                    className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <ArrowClockwise className="w-4 h-4 mr-2" />
+                    Sync
+                  </Button>
+                )}
+                <Button onClick={handleCreateCharacter} className="glow-hover">
+                  <Sparkles className="w-4 h-4 mr-2" weight="fill" />
+                  Create New Character
+                </Button>
+              </div>
             </div>
             
             <CharacterList
@@ -137,6 +220,18 @@ function App() {
           </div>
         )}
       </div>
+      
+      {/* Toast Container */}
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            color: 'var(--card-foreground)',
+          },
+        }}
+      />
     </div>
   );
 }
