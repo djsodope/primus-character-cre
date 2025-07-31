@@ -82,7 +82,10 @@
 }
 
 .stat-block {
-  @apply fantasy-border parchment-bg p-4;
+  @apply parchment-bg p-4;
+  border: 2px solid oklch(0.35 0.15 15);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px oklch(0.35 0.15 15 / 0.1);
 }
 
 .glow-hover {
