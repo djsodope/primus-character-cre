@@ -11,7 +11,7 @@ import { RegisterForm } from './components/RegisterForm';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Scroll, Sparkles, SignIn, ArrowClockwise } from '@phosphor-icons/react';
+import { Scroll, Sparkle, SignIn, ArrowClockwise } from '@phosphor-icons/react';
 import { Toaster } from 'sonner';
 
 type ViewMode = 'list' | 'create' | 'edit' | 'sheet';
@@ -150,7 +150,7 @@ function App() {
             {/* Header */}
             <div className="text-center mb-12">
               <div className="flex items-center justify-center gap-3 mb-4">
-                <Sparkles className="w-8 h-8 text-accent" weight="fill" />
+                <Sparkle className="w-8 h-8 text-accent" weight="fill" />
                 <h1 className="font-serif text-4xl font-bold text-primary">
                   Primus Character Creator
                 </h1>
@@ -217,7 +217,7 @@ function App() {
                     className="w-full glow-hover"
                     size="lg"
                   >
-                    <Sparkles className="w-5 h-5 mr-2" weight="fill" />
+                    <Sparkle className="w-5 h-5 mr-2" weight="fill" />
                     Create Your First Character
                   </Button>
                 </CardContent>
@@ -233,7 +233,7 @@ function App() {
                   </h2>
                   <div className="flex gap-2">
                     <Button onClick={handleCreateCharacter} className="glow-hover">
-                      <Sparkles className="w-4 h-4 mr-2" weight="fill" />
+                      <Sparkle className="w-4 h-4 mr-2" weight="fill" />
                       Create New Character
                     </Button>
                   </div>
